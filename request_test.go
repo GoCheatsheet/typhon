@@ -2,6 +2,7 @@ package typhon
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -69,11 +70,22 @@ func TestRequestEncodeProtobuf(t *testing.T) {
 	g := &prototest.Greeting{
 		Message: "Hello world!",
 		Priority: 1}
-	req := NewRequest(nil, "GET", "/", nil)
-	req.EncodeAsProtobuf(g)
-	assert.Equal(t, "application/x-protobuf", req.Header.Get("Content-Type"))
+
+	// test by encoding via the context key
+	ctx := context.WithValue(context.Background(), EncodeRequestAsProtobuf{}, "true")
+	req := NewRequest(ctx, "GET", "/", g)
+	assert.Equal(t, "application/protobuf", req.Header.Get("Content-Type"))
 	assert.EqualValues(t, 16, req.ContentLength)
 	body, err := ioutil.ReadAll(req.Body)
+	require.NoError(t, err)
+	assert.Subset(t, body, []byte("Hello world!"))
+
+	// test by calling the encoding function directly
+	req = NewRequest(nil, "GET", "/", nil)
+	req.EncodeAsProtobuf(g)
+	assert.Equal(t, "application/protobuf", req.Header.Get("Content-Type"))
+	assert.EqualValues(t, 16, req.ContentLength)
+	body, err = ioutil.ReadAll(req.Body)
 	require.NoError(t, err)
 	assert.Subset(t, body, []byte("Hello world!"))
 }

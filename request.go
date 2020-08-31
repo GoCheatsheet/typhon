@@ -40,8 +40,22 @@ func (r *Request) unwrappedContext() context.Context {
 	}
 }
 
+// EncodeRequestAsProtobuf is a context key that can be used to enable
+// encoding of a request body as protobuf (a form of prior knowledge that
+// the downstream can decode it).
+type EncodeRequestAsProtobuf struct{}
+
 // Encode serialises the passed object as JSON into the body (and sets appropriate headers).
 func (r *Request) Encode(v interface{}) {
+	// If we have a proto.Message and have the blessing of the callee, we
+	// should encode our request payload as protobuf
+	if m, ok := v.(proto.Message); ok {
+		if s, ok := r.Context.Value(EncodeRequestAsProtobuf{}).(string); ok && s != "" {
+			r.EncodeAsProtobuf(m)
+			return
+		}
+	}
+
 	// If we were given an io.ReadCloser or an io.Reader (that is not also a json.Marshaler), use it directly
 	switch v := v.(type) {
 	case json.Marshaler:
@@ -75,7 +89,7 @@ func (r *Request) EncodeAsProtobuf(m proto.Message) {
 		r.err = terrors.Wrap(err, nil)
 		return
 	}
-	r.Header.Set("Content-Type", "application/x-protobuf")
+	r.Header.Set("Content-Type", "application/protobuf")
 	r.ContentLength = int64(n)
 }
 
