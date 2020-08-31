@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/monzo/typhon/prototest"
 )
 
 // TestRequestDecodeCloses verifies that a request body is closed after calling Decode()
@@ -60,4 +62,18 @@ func TestRequestEncodeReader(t *testing.T) {
 	body, err = ioutil.ReadAll(req.Body)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("{}\n"), body)
+}
+
+// TestRequestEncodeAsProtobuf tests encoding the request body as protobuf
+func TestRequestEncodeProtobuf(t *testing.T) {
+	g := &prototest.Greeting{
+		Message: "Hello world!",
+		Priority: 1}
+	req := NewRequest(nil, "GET", "/", nil)
+	req.EncodeAsProtobuf(g)
+	assert.Equal(t, "application/x-protobuf", req.Header.Get("Content-Type"))
+	assert.EqualValues(t, 16, req.ContentLength)
+	body, err := ioutil.ReadAll(req.Body)
+	require.NoError(t, err)
+	assert.Subset(t, body, []byte("Hello world!"))
 }
