@@ -88,4 +88,25 @@ func TestRequestEncodeProtobuf(t *testing.T) {
 	body, err = ioutil.ReadAll(req.Body)
 	require.NoError(t, err)
 	assert.Subset(t, body, []byte("Hello world!"))
+
+	// test encoding an io.Reader even with the context key enabled (should fallthrough)
+	r := strings.NewReader("hello world, again")
+	req = NewRequest(ctx, "GET", "/", nil)
+	req.Encode(r)
+	assert.EqualValues(t, -1, req.ContentLength)
+	assert.Empty(t, req.Header.Get("Content-Type"))
+	body, err = ioutil.ReadAll(req.Body)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("hello world, again"), body)
+
+	// test encoding a JSON marshaler with the context key enabled (should fallthrough)
+	jm := jsonMarshalerReader{
+		ReadCloser: ioutil.NopCloser(strings.NewReader("this should never see the light of day"))}
+	req = NewRequest(ctx, "GET", "/", nil)
+	req.Encode(jm)
+	assert.EqualValues(t, 3, req.ContentLength)
+	assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+	body, err = ioutil.ReadAll(req.Body)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("{}\n"), body)
 }
